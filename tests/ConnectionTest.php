@@ -5,7 +5,6 @@ namespace Tests;
 
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\MongoDB\Connection;
-use MongoDB\Database as MongoDatabase;
 
 final class ConnectionTest extends BaseMongoTestCase
 {

@@ -209,7 +209,8 @@ class Connection extends BaseConnection
     public function getVersion(): string
     {
         try {
-            $buildInfo = $this->mongoDB?->command(['buildInfo' => 1])->toArray()[0] ?? null;
+            //$buildInfo = $this->mongoDB?->command(['buildInfo' => 1])->toArray()[0] ?? null;
+            $buildInfo = $this->runCommand(['buildInfo' => 1])->toArray()[0] ?? null;
             if ($buildInfo && isset($buildInfo->version)) {
                 return (string) $buildInfo->version;
             }
@@ -674,7 +675,8 @@ class Connection extends BaseConnection
 
         try {
             // Выполняем команду
-            $cursor = $this->mongoDB->command($commandDoc, $options);
+            //$cursor = $this->mongoDB->command($commandDoc, $options);
+            $cursor = $this->runCommand($commandDoc, $options);
 
             return $cursor;
         } catch (CommandException $e) {
@@ -708,6 +710,29 @@ class Connection extends BaseConnection
             $this->lastInsertedId = null;
         }
         $this->lastAffected = $affected > 0 ? $affected : 0;
+    }
+
+
+    /**
+     * Выполнить произвольную команду MongoDB.
+     * Если команда — renameCollection, она должна выполняться в базе admin.
+     */
+    public function runCommand(array $command)
+    {
+        $firstKey = (string) (is_string(array_key_first($command)) ? array_key_first($command) : '');
+        $useAdmin = ($firstKey === 'renameCollection');
+
+        // Выбираем правильную БД для выполнения команды.
+        $db = $useAdmin
+            ? $this->client->selectDatabase('admin')
+            : $this->mongoDB;
+
+        // Пробрасываем как DatabaseCommand, чтобы сохранить текущую механику ошибок
+        try {
+            return $db->command($command);
+        } catch (\MongoDB\Driver\Exception\CommandException $e) {
+            throw new \CodeIgniter\Database\Exceptions\DatabaseException('MongoDB command failed: ' . $e->getMessage(), previous: $e);
+        }
     }
 
 
@@ -1260,6 +1285,16 @@ class Connection extends BaseConnection
         }
 
         return $jsonSchema;
+    }
+
+    /**
+     * Public wrapper used by Forge: returns collection's validator $jsonSchema (or empty array if none).
+     *
+     * @return array<string,mixed>
+     */
+    public function getCollectionSchema(string $table): array
+    {
+        return $this->_getValidatorScheme($table);
     }
 
     /**

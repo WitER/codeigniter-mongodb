@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Tests;
 
-use \CodeIgniter\Test\CIUnitTestCase;
+use CodeIgniter\Test\CIUnitTestCase;
 use CodeIgniter\Test\DatabaseTestTrait;
 use Config\Database;
 
