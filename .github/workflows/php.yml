@@ -17,7 +17,7 @@ jobs:
 
     services:
       mongodb:
-        image: mongo:4.4.6
+        image: mongo:7.0.14
         env:
           MONGO_INITDB_ROOT_USERNAME: admin
           MONGO_INITDB_ROOT_PASSWORD: admin
@@ -45,7 +45,7 @@ jobs:
           php-version: ${{ matrix.php-versions }}
           tools: composer, pecl
           coverage: xdebug
-          extensions: mongodb
+          extensions: mongodb-1.19.x
         env:
           COMPOSER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

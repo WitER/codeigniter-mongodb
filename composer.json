@@ -20,7 +20,7 @@
   ],
   "require": {
     "php": ">=8.1",
-    "mongodb/mongodb": "^v1.18",
+    "mongodb/mongodb": "^v1.19.x-dev",
     "ext-mongodb": "^1.19"
   },
   "minimum-stability": "dev",
