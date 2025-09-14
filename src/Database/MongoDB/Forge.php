@@ -713,46 +713,32 @@ class Forge extends BaseForge
     /**
      * Rename collection (renameTable analogue).
      */
-    public function renameTable(string $table, string $newName): bool
+    public function renameTable(string $table, string $newName)
     {
-        /** @var Connection $conn */
-        $conn = $this->db;
-        if (! $conn->mongoDB instanceof MongoDatabase) {
-            $conn->connect();
+        $fromDb  = (string) $this->db->database;
+        $prefix  = (string) $this->db->DBPrefix;
+
+        // Учитываем префикс физического имени
+        $fromColl = $prefix . $table;
+        $toColl   = $prefix . $newName;
+
+        $cmd = [
+            'renameCollection' => $fromDb . '.' . $fromColl,
+            'to'               => $fromDb . '.' . $toColl,
+            'dropTarget'       => false,
+        ];
+
+        // Выполнить команду через соединение, чтобы она ушла в admin
+        if (method_exists($this->db, 'runCommand')) {
+            $this->db->runCommand($cmd);
+        } else {
+            // Fallback: прямой вызов admin-команды (на случай старого соединения)
+            $this->db->mongoClient->selectDatabase('admin')->command($cmd);
         }
 
-        try {
-            $res = $this->runCommand([
-                'renameCollection' => $this->fqcn($table),
-                'to'               => $this->fqcn($newName),
-                'dropTarget'       => false,
-            ]);
-            if ($res === false) {
-                $this->_reset();
-                return false;
-            }
-            // Update data cache like BaseForge
-            if (! empty($this->db->dataCache['table_names'])) {
-                $oldPref = $this->applyPrefixOnce($table);
-                $key = array_search(
-                    strtolower($oldPref),
-                    array_map(strtolower(...), $this->db->dataCache['table_names']),
-                    true,
-                );
-                if ($key !== false) {
-                    $this->db->dataCache['table_names'][$key] = $this->applyPrefixOnce($newName);
-                }
-            }
-            $this->_reset();
-            return true;
-        } catch (\Throwable $e) {
-            if ($this->db->DBDebug) {
-                throw new DatabaseException('MongoDB renameCollection failed: ' . $e->getMessage(), (int) $e->getCode(), $e);
-            }
-            $this->_reset();
-            return false;
-        }
+        return true;
     }
+
 
     /**
      * No-op createDatabase/dropDatabase for MongoDB (drop-in compatibility).
@@ -776,11 +762,50 @@ class Forge extends BaseForge
      */
     public function addColumn(string $table, $fields): bool
     {
-        // Use provided field definitions to extend validator
+        // Обновляем валидатор коллекции: добавляем новые поля в JSON Schema.
+        // Используем уже реализованную логику modifyTable() с построением схемы из $this->fields.
         $this->fields = is_array($fields) ? $fields : [$fields => []];
         $ok = $this->modifyTable($table);
-        return $ok;
+        if (!$ok) {
+            return false;
+        }
+
+        // Опционально проставим default-значения, если они были указаны.
+        $set = [];
+        foreach ($this->fields as $name => $def) {
+            if (is_array($def) && array_key_exists('default', $def)) {
+                $set[(string)$name] = $def['default'];
+            }
+        }
+        if ($set !== []) {
+            $collection = $this->db->DBPrefix . $table;
+            $cmd = [
+                'update'  => $collection,
+                'updates' => [[
+                    'q' => new \stdClass(),           // {}
+                    'u' => ['$set' => $set],
+                    'multi' => true,
+                ]],
+            ];
+            if (method_exists($this->db, 'runCommand')) {
+                $this->db->runCommand($cmd);
+            } else {
+                $this->db->mongoDB->command($cmd);
+            }
+        }
+
+        // Очистим кеш схемы/полей
+        if (property_exists($this->db, 'dataCache') && is_array($this->db->dataCache)) {
+            unset($this->db->dataCache['field_names'][$this->db->DBPrefix . $table]);
+            unset($this->db->dataCache['field_names'][$table]);
+            unset($this->db->dataCache['field_data'][$this->db->DBPrefix . $table]);
+            unset($this->db->dataCache['field_data'][$table]);
+        }
+
+        return true;
     }
+
+
 
     public function modifyColumn(string $table, $fields): bool
     {
@@ -789,178 +814,78 @@ class Forge extends BaseForge
         return $ok;
     }
 
-    public function dropColumn(string $table, $columnNames): bool
+    public function dropColumn(string $table, $column)
     {
+        $cols = is_array($column) ? $column : [$column];
+
+        // 1) Обновляем валидатор: удаляем свойства и из required
         /** @var Connection $conn */
         $conn = $this->db;
-
-        // Опции управления миграцией данных и индексами
-        $migrateExisting = false;
-        $allowNoFilterWrite = false;
-        $batchSize = null; // int|null
-        $limit = null;     // int|null
-        $autoFixIndexes = false;
-
-        $columnsParam = $columnNames;
-        if (is_array($columnsParam)) {
-            if (array_key_exists('migrateExisting', $columnsParam)) {
-                $migrateExisting = (bool) $columnsParam['migrateExisting'];
-                unset($columnsParam['migrateExisting']);
-            }
-            if (array_key_exists('allowNoFilterWrite', $columnsParam)) {
-                $allowNoFilterWrite = (bool) $columnsParam['allowNoFilterWrite'];
-                unset($columnsParam['allowNoFilterWrite']);
-            }
-            if (array_key_exists('batchSize', $columnsParam)) {
-                $batchSize = is_numeric($columnsParam['batchSize']) ? max(1, (int)$columnsParam['batchSize']) : null;
-                unset($columnsParam['batchSize']);
-            }
-            if (array_key_exists('limit', $columnsParam)) {
-                $limit = is_numeric($columnsParam['limit']) ? max(1, (int)$columnsParam['limit']) : null;
-                unset($columnsParam['limit']);
-            }
-            if (array_key_exists('autoFixIndexes', $columnsParam)) {
-                $autoFixIndexes = (bool) $columnsParam['autoFixIndexes'];
-                unset($columnsParam['autoFixIndexes']);
-            }
-        }
-        if (is_array($columnsParam) && array_key_exists('columns', $columnsParam) && is_array($columnsParam['columns'])) {
-            $columns = array_map('strval', $columnsParam['columns']);
-        } else {
-            $columns = is_array($columnsParam) ? array_map('strval', $columnsParam) : [(string) $columnsParam];
-        }
-
-        if (! $migrateExisting && function_exists('log_message')) {
-            log_message('warning', "MongoDB Forge: dropColumn on '{$table}' updates only the validator; existing documents will retain fields: " . implode(', ', $columns) . ". Pass migrateExisting=true to remove them from documents.");
-        }
-
-        // Fetch current schema and remove columns
         $schema = $conn->getCollectionSchema($table);
-        if ($schema === []) {
-            $this->_reset();
-            return true;
-        }
-        $props = $schema['properties'] ?? [];
-        foreach ($columns as $col) {
-            unset($props[$col]);
-        }
-        $schema['properties'] = $props;
-        if (!empty($schema['required'])) {
-            $schema['required'] = array_values(array_diff($schema['required'], $columns));
-            if ($schema['required'] === []) {
+        if ($schema !== []) {
+            $props = $schema['properties'] ?? [];
+            $required = $schema['required'] ?? [];
+            foreach ($cols as $c) {
+                $name = (string)$c;
+                unset($props[$name]);
+                if (is_array($required)) {
+                    $idx = array_search($name, $required, true);
+                    if ($idx !== false) {
+                        unset($required[$idx]);
+                    }
+                }
+            }
+            $schema['properties'] = $props;
+            if (!empty($required)) {
+                $schema['required'] = array_values($required);
+            } else {
                 unset($schema['required']);
             }
-        }
-        try {
-            $res = $this->runCommand([
-                'collMod'   => $this->applyPrefixOnce($table),
+            $pref = $this->db->DBPrefix . $table;
+            $cmd = [
+                'collMod'   => $pref,
                 'validator' => ['$jsonSchema' => $schema],
-            ]);
-            if ($res === false) {
-                $this->_reset();
-                return false;
-            }
-        } catch (\Throwable $e) {
-            if ($this->db->DBDebug) {
-                throw new DatabaseException('MongoDB dropColumn(collMod) failed: ' . $e->getMessage(), (int) $e->getCode(), $e);
-            }
-            $this->_reset();
-            return false;
-        }
-
-        // Миграция данных: удаляем поля из существующих документов
-        if ($migrateExisting) {
-            $start = microtime(true);
-            try {
-                $unset = [];
-                foreach ($columns as $c) { $unset[$c] = ''; }
-                // Ограничиваем поиск документами, где поле существует
-                $existsOr = [];
-                foreach ($columns as $c) { $existsOr[] = [$c => ['$exists' => true]]; }
-                $filter = $existsOr ? ['$or' => $existsOr] : [];
-
-                $pref = $this->applyPrefixOnce($table);
-
-                if (($limit === null && $batchSize === null) && ! $allowNoFilterWrite) {
-                    if (function_exists('log_message')) {
-                        log_message('error', "MongoDB Forge: Refusing to updateMany without filter on dropColumn('{$table}'). Set allowNoFilterWrite=true or provide limit/batchSize.");
-                    }
-                } else if ($limit === null && $batchSize === null && $allowNoFilterWrite) {
-                    // Full collection update (dangerous unless user allowed)
-                    $this->runCommand([
-                        'update'  => $pref,
-                        'updates' => [ ['q' => new \stdClass(), 'u' => ['$unset' => $unset], 'multi' => true] ],
-                    ]);
-                } else {
-                    $max = $limit ?? PHP_INT_MAX;
-                    $bs = $batchSize ?? min(1000, $max);
-                    // Fetch up to $max ids using find command
-                    $findCmd = [
-                        'find'       => $pref,
-                        'filter'     => $filter === [] ? new \stdClass() : $filter,
-                        'projection' => ['_id' => 1],
-                        'limit'      => $max,
-                    ];
-                    $res = $this->runCommand($findCmd);
-                    $rows = is_object($res) && method_exists($res, 'getResultArray') ? $res->getResultArray() : [];
-                    $ids = [];
-                    foreach ($rows as $row) {
-                        if (isset($row['_id'])) { $ids[] = $row['_id']; }
-                    }
-                    // Chunk and update
-                    for ($i = 0, $n = count($ids); $i < $n; $i += $bs) {
-                        $chunk = array_slice($ids, $i, $bs);
-                        if ($chunk === []) { break; }
-                        $this->runCommand([
-                            'update'  => $pref,
-                            'updates' => [ ['q' => ['_id' => ['$in' => $chunk]], 'u' => ['$unset' => $unset], 'multi' => true] ],
-                        ]);
-                    }
-                }
-            } catch (\Throwable $e) {
-                if ($this->db->DBDebug) {
-                    throw new DatabaseException('MongoDB dropColumn(updateMany) failed: ' . $e->getMessage(), (int) $e->getCode(), $e);
-                }
-                $this->_reset();
-                return false;
-            } finally {
-                if (function_exists('log_message')) {
-                    $durMs = (int) round((microtime(true) - $start) * 1000);
-                    log_message('info', "MongoDB Forge: dropColumn migrateExisting on '{$table}' took {$durMs} ms.");
-                }
+            ];
+            if (method_exists($this->db, 'runCommand')) {
+                $this->db->runCommand($cmd);
+            } else {
+                $this->db->mongoDB->command($cmd);
             }
         }
 
-        // Синхронизация индексов: удалить индексы, где встречаются удаляемые поля
-        if ($autoFixIndexes) {
-            $impacted = [];
-            foreach ($this->listIndexes($table) as $spec) {
-                $name = (string)($spec['name'] ?? '');
-                $key  = (array)($spec['key'] ?? []);
-                $fields = array_map('strval', array_keys($key));
-                if (array_intersect($fields, $columns)) {
-                    if ($name !== '' && $name !== '_id_') { $impacted[] = $name; }
-                }
-            }
-            if ($impacted !== []) {
-                $this->dropIndexes($table, $impacted);
-            }
+        // 2) Физически удаляем поле из всех документов ($unset)
+        $unset = [];
+        foreach ($cols as $c) {
+            $unset[(string)$c] = 1;
+        }
+        $collection = $this->db->DBPrefix . $table;
+        $cmd = [
+            'update'  => $collection,
+            'updates' => [[
+                'q' => new \stdClass(),           // {}
+                'u' => ['$unset' => $unset],
+                'multi' => true,
+            ]],
+        ];
+
+        if (method_exists($this->db, 'runCommand')) {
+            $this->db->runCommand($cmd);
         } else {
-            foreach ($this->listIndexes($table) as $spec) {
-                $name = (string)($spec['name'] ?? '');
-                $key  = (array)($spec['key'] ?? []);
-                $fields = array_map('strval', array_keys($key));
-                if (array_intersect($fields, $columns)) {
-                    if (function_exists('log_message')) {
-                        log_message('warning', "MongoDB Forge: dropColumn detected index '{$name}' contains dropped fields (" . implode(',', array_intersect($fields, $columns)) . ") on '{$table}'. Consider removing or recreating index or pass autoFixIndexes=true.");
-                    }
-                }
-            }
+            $this->db->mongoDB->command($cmd);
         }
 
-        $this->_reset();
+        // 3) Очистка кеша полей/схемы
+        if (property_exists($this->db, 'dataCache') && is_array($this->db->dataCache)) {
+            unset($this->db->dataCache['field_names'][$this->db->DBPrefix . $table]);
+            unset($this->db->dataCache['field_names'][$table]);
+            unset($this->db->dataCache['field_data'][$this->db->DBPrefix . $table]);
+            unset($this->db->dataCache['field_data'][$table]);
+        }
+
         return true;
     }
+
+
 
     public function renameColumn(string $table, array $field): bool
     {

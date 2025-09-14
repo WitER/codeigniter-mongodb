@@ -1,0 +1,48 @@
+name: PHP Tests
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+
+  tests:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        php-version: [ '8.1', '8.2', '8.3' ]
+        mongodb-version: [ '7.0' ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start MongoDB v${{ matrix.mongodb-version }}
+        uses: supercharge/mongodb-github-action@1.12.0
+        with:
+          mongodb-version: ${{ matrix.mongodb-version }}
+          mongodb-username: ${{ secrets.MONGO_USER }}
+          mongodb-password: ${{ secrets.MONGO_PASSWORD }}
+          mongodb-port: 27017
+
+      - name: Setup PHP v${{ matrix.php-version }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          tools: composer, pecl
+          coverage: xdebug
+          extensions: mongodb-1.21.1
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-suggest
+
+      - name: Run tests
+        run: vendor/bin/phpunit --coverage-text
+        env:
+          database.tests.port: 27017
+          database.tests.username: ${{ secrets.MONGO_USER }}
+          database.tests.password: ${{ secrets.MONGO_PASSWORD }}

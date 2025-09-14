@@ -246,7 +246,14 @@ class Builder extends BaseBuilder
 
     // Grouping with stack: groupStart/orGroupStart/notGroupStart + groupEnd/orGroupEnd
     public function groupStart(): self { $this->groupStack[] = ['op' => '$and', 'terms' => []]; return $this; }
-    public function orGroupStart(): self { $this->groupStack[] = ['op' => '$or', 'terms' => []]; return $this; }
+    public function orGroupStart(): self {
+        // Внутри группы условия должны соединяться по AND.
+        // OR применяется только при закрытии группы (orGroupEnd), чтобы
+        // объединить всю группу с предыдущим фильтром как единый термин.
+        $this->groupStack[] = ['op' => '$and', 'terms' => []];
+        return $this;
+    }
+
     public function notGroupStart(): self { $this->groupStack[] = ['op' => '$nor', 'terms' => []]; return $this; }
 
     public function groupEnd(): self { return $this->closeGroup(false); }

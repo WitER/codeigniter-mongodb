@@ -8,7 +8,8 @@
 [![GitHub issues](https://img.shields.io/github/issues/WitER/codeigniter-mongodb.svg)](https://github.com/WitER/codeigniter-mongodb/issues)
 [![GitHub stars](https://img.shields.io/github/stars/WitER/codeigniter-mongodb.svg?style=social)](https://github.com/WitER/codeigniter-mongodb)
 
-English version (Russian version below)
+> **Disclaimer:** This driver doesn't claim to have high code quality and functionality. If you need it or have ideas/desire/time to improve it, it would be great.
+
 
 Native MongoDB database driver for CodeIgniter 4. Fully integrates with CI4's connection factory (Config\Database::connect()) and the Query Builder. It provides a convenient API for MongoDB CRUD operations, aggregations, and transactions while keeping familiar CodeIgniter interfaces.
 

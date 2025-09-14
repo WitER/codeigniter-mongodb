@@ -3,12 +3,14 @@ declare(strict_types=1);
 
 namespace Tests;
 
-use Tests\BaseMongoTestCase;
 use Tests\Support\Entities\User;
 use Tests\Support\Models\UserModel;
 
 final class ModelEntityTest extends BaseMongoTestCase
 {
+    /**
+     * @throws \ReflectionException
+     */
     public function testModelCrudAndEntityHydration(): void
     {
         $model = new UserModel();

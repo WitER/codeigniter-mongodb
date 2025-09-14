@@ -8,6 +8,9 @@ use Tests\Support\Entities\User;
 
 final class EntityCastingTest extends BaseMongoTestCase
 {
+    /**
+     * @throws \ReflectionException
+     */
     public function testEntityCastingAndDates(): void
     {
         $model = new UserModel();
@@ -37,7 +40,7 @@ final class EntityCastingTest extends BaseMongoTestCase
         // Modify and save to update updated_at
         $oldUpdated = (string) $u->updated_at;
         $u->age = 28;
-        $saved = $model->save($u);
+        $model->save($u);
         $u2 = $model->find($id);
         $this->assertSame(28, $u2->age);
         $this->assertNotSame($oldUpdated, (string) $u2->updated_at);

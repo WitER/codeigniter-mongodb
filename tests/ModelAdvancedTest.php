@@ -7,6 +7,9 @@ use Tests\Support\Models\UserModel;
 
 final class ModelAdvancedTest extends BaseMongoTestCase
 {
+    /**
+     * @throws \ReflectionException
+     */
     public function testAllowedFieldsAndValidationAndTimestamps(): void
     {
         $model = new UserModel();
