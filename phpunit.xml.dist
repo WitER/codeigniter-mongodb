@@ -44,10 +44,11 @@
         <const name="PUBLICPATH" value="./vendor/codeigniter4/codeigniter4/public/"/>
 
         <!-- Database configuration -->
-        <env name="database.tests.hostname" value="127.0.0.1"/>
+        <env name="database.tests.hostname" value="localhost"/>
         <env name="database.tests.port" value="27017"/>
         <env name="database.tests.database" value="codeigniter_mongodb"/>
         <env name="database.tests.username" value=""/>
+        <env name="database.tests.password" value=""/>
         <env name="database.tests.DBDebug" value="true"/>
         <env name="database.tests.DBDriver" value="MongoDB"/>
         <env name="database.tests.DBPrefix" value="tests_"/>
