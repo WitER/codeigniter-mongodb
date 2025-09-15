@@ -4,24 +4,22 @@
 [![Packagist Version](https://img.shields.io/packagist/v/witer/codeigniter-mongodb.svg)](https://packagist.org/packages/witer/codeigniter-mongodb)
 [![PHP Version](https://img.shields.io/packagist/php-v/witer/codeigniter-mongodb.svg)](https://packagist.org/packages/witer/codeigniter-mongodb)
 [![Downloads](https://img.shields.io/packagist/dt/witer/codeigniter-mongodb.svg)](https://packagist.org/packages/witer/codeigniter-mongodb)
-[![License: MIT](https://img.shields.io/packagist/l/witer/codeigniter-mongodb.svg)](LICENSE)
 [![GitHub issues](https://img.shields.io/github/issues/WitER/codeigniter-mongodb.svg)](https://github.com/WitER/codeigniter-mongodb/issues)
 [![GitHub stars](https://img.shields.io/github/stars/WitER/codeigniter-mongodb.svg?style=social)](https://github.com/WitER/codeigniter-mongodb)
 
 > **Disclaimer:** This driver doesn't claim to have high code quality and functionality. If you need it or have ideas/desire/time to improve it, it would be great.
 
 
-Native MongoDB database driver for CodeIgniter 4. Fully integrates with CI4's connection factory (Config\Database::connect()) and the Query Builder. It provides a convenient API for MongoDB CRUD operations, aggregations, and transactions while keeping familiar CodeIgniter interfaces.
+Native MongoDB database driver for CodeIgniter 4. Fully integrates with CI4's connection factory (Config\Database::connect()) and the Query Builder.
+It provides a convenient API for MongoDB CRUD operations, aggregations, and transactions while keeping familiar CodeIgniter interfaces.
 
-Project page: https://github.com/WitER/codeigniter-mongodb
-Packagist: https://packagist.org/packages/witer/codeigniter-mongodb
 
 ## Features
 - Connect to MongoDB through the standard CodeIgniter DB interface (`DBDriver => 'MongoDB'`).
-- Most Query Builder methods supported: select, where/orWhere, whereIn, like, orderBy, limit/offset, insert/update/delete, insertBatch/updateBatch/replace, and more.
-- Mongo-specific builder operations: setInc/setDec ($inc), unsetField ($unset), setOnInsert ($setOnInsert), push/pull/addToSet (array operations), upsert flag, allow writes without a filter.
-- Aggregations: selectMin/Max/Avg/Sum/Count and pipeline building for aggregate().
-- MongoDB transactions via driver sessions (replica set required).
+- Most Query Builder methods supported: `select`, `where`/`orWhere`, `whereIn`, `like`, `orderBy`, `limit`/`offset`, `insert`/`update`/`delete`, `insertBatch`/`updateBatch`/`replace`, and more.
+- Mongo-specific builder operations: `setInc`/`setDec` ($inc), `unsetField` ($unset), `setOnInsert` ($setOnInsert), `push`/`pull`/`addToSet` (array operations), upsert flag, allow writes without a filter. (**NOT TESTED**)
+- Aggregations: `select[Min|Max|Avg|Sum|Count]` and pipeline building for aggregate().
+- MongoDB transactions via driver sessions (**replica set required**).
 - getCompiled… helpers for debugging: output of "pseudo-SQL"/Mongo JSON request.
 - Compatible with CodeIgniter 4 Models/Entities (including field casting).
 - Introspection methods: list collections, fields, index info, read validator schema.
@@ -102,7 +100,7 @@ $db->setDatabase('another_db');
 ```
 
 ## Using the Query Builder
-- select([...]) — list of fields (default is "*"). For nested fields use dot notation: `profile.age`.
+- select([...]) — list of fields (default is "*").
 - where()/orWhere()/whereNot()/orWhereNot() — conditions, arrays and expressions supported.
 - whereIn()/whereNotIn()/orWhereIn()/orWhereNotIn()
 - like()/notLike()/orLike()/orNotLike() — case-insensitive search is supported via $insensitiveSearch flag.
@@ -116,7 +114,6 @@ Mongo-specific methods:
 - setOnInsert('field', value) — $setOnInsert
 - push('field', value)/pull('field', value)/addToSet('field', value)
 - setUpsertFlag(true|false) — upsert for update/replace
-- allowNoFilterWrite(true|false) — allow write operations without where
 
 Examples:
 ```php
@@ -194,7 +191,7 @@ class UserModel extends Model
     protected $returnType = \App\Entities\User::class; // optional
 
     protected $casts = [
-        '_id'        => 'objectid',
+        '_id'        => 'string',
         'created_at' => 'datetime',
         'roles'      => 'array',
     ];
@@ -238,10 +235,6 @@ GitHub Actions workflow (php.yml) is configured to run tests automatically. See 
 
 ## Migrations and seeds
 You can use the standard CI4 mechanisms. Tests contain examples of migrations/seeds for MongoDB (see tests/_support folder).
-
-## FAQ
-- CI badge not showing? Make sure the workflow file is named `php.yml` and located at `.github/workflows`. The local project tree may differ, but GitHub requires the path `.github/workflows/php.yml`.
-- How to set the connection string? Use `dsn` (recommended) or separate `hostname/port/username/password/database` parameters.
 
 ## License
 MIT (see LICENSE file).
