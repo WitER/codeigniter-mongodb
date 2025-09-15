@@ -10,10 +10,8 @@
 > **Дисклеймер:** Этот драйвер не претендует на высокое качество кода и работоспособность, если вам он нужен или есть идеи\желание\время на его доработку - будет отлично
 
 
-Нативный драйвер базы данных MongoDB для CodeIgniter 4. Драйвер полностью интегрируется с фабрикой соединений CI4 (Config\Database::connect()) и Query Builder’ом, предоставляет удобный API для CRUD‑операций, агрегаций и транзакций MongoDB, сохраняя привычные интерфейсы CodeIgniter.
-
-Сайт пакета: https://github.com/WitER/codeigniter-mongodb
-Пакет на Packagist: https://packagist.org/packages/witer/codeigniter-mongodb
+Нативный драйвер базы данных MongoDB для CodeIgniter 4.
+Драйвер полностью интегрируется с фабрикой соединений CI4 (Config\Database::connect()) и Query Builder’ом, предоставляет удобный API для CRUD‑операций, агрегаций и транзакций MongoDB, сохраняя привычные интерфейсы CodeIgniter.
 
 ## Возможности
 - Подключение к MongoDB через стандартный интерфейс БД CodeIgniter (`DBDriver => 'MongoDB'`).
