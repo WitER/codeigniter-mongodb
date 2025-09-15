@@ -4,7 +4,6 @@
 [![Packagist Version](https://img.shields.io/packagist/v/witer/codeigniter-mongodb.svg)](https://packagist.org/packages/witer/codeigniter-mongodb)
 [![PHP Version](https://img.shields.io/packagist/php-v/witer/codeigniter-mongodb.svg)](https://packagist.org/packages/witer/codeigniter-mongodb)
 [![Downloads](https://img.shields.io/packagist/dt/witer/codeigniter-mongodb.svg)](https://packagist.org/packages/witer/codeigniter-mongodb)
-[![License: MIT](https://img.shields.io/packagist/l/witer/codeigniter-mongodb.svg)](LICENSE)
 [![GitHub issues](https://img.shields.io/github/issues/WitER/codeigniter-mongodb.svg)](https://github.com/WitER/codeigniter-mongodb/issues)
 [![GitHub stars](https://img.shields.io/github/stars/WitER/codeigniter-mongodb.svg?style=social)](https://github.com/WitER/codeigniter-mongodb)
 
@@ -17,14 +16,14 @@
 Пакет на Packagist: https://packagist.org/packages/witer/codeigniter-mongodb
 
 ## Возможности
-- Подключение к MongoDB через стандартный интерфейс CodeIgniter DB (`DBDriver => 'MongoDB'`).
-- Поддержка большинства методов Query Builder: select, where/orWhere, whereIn, like, orderBy, limit/offset, insert/update/delete, insertBatch/updateBatch/replace и др.
-- Специальные Mongo‑операции в билдере: setInc/setDec ($inc), unsetField ($unset), setOnInsert ($setOnInsert), push/pull/addToSet (работа с массивами), upsert‑флаг, разрешение записей без фильтра.
-- Агрегации: selectMin/Max/Avg/Sum/Count и построение pipeline для aggregate().
-- Транзакции MongoDB через сессии драйвера (требуется реплика‑сет).
-- Поддержка getCompiled… для отладки: вывод «псевдо‑SQL»/Mongo JSON запроса.
-- Совместимость с моделями/сущностями CodeIgniter 4 (в т.ч. кастинг полей).
-- Методы introspection: список коллекций, полей, индексная информация, чтение схемы валидатора.
+- Подключение к MongoDB через стандартный интерфейс БД CodeIgniter (`DBDriver => 'MongoDB'`).
+- Поддерживается большинство методов построителя запросов: `select`, `where`/`orWhere`, `whereIn`, `like`, `orderBy`, `limit`/`offset`, `insert`/`update`/`delete`, `insertBatch`/`updateBatch`/`replace` и другие.
+- Специфичные для Mongo операции построителя: `setInc`/`setDec` ($inc), `unsetField` ($unset), `setOnInsert` ($setOnInsert), `push`/`pull`/`addToSet` (операции с массивами), флаг upsert, возможность записи без фильтра. (**НЕ ПРОВЕРЕНО**)
+- Агрегации: `select[Min|Max|Avg|Sum|Count]` и построение конвейера для `aggregate()`.
+- Транзакции MongoDB через сессии драйвера (**требуется реплика-сет**).
+- Вспомогательные методы `getCompiled…` для отладки: вывод «псевдо-SQL»/Mongo JSON-запроса.
+- Совместим с моделями/сущностями CodeIgniter 4 (включая приведение типов полей).
+- Методы интроспекции: вывод списка коллекций, полей, информации об индексах, чтение схемы валидатора.
 
 ## Требования
 - PHP >= 8.1
@@ -102,7 +101,7 @@ $db->setDatabase('another_db');
 ```
 
 ## Использование Query Builder
-- select([...]) — перечисление полей (по умолчанию «*»). Для вложенных полей используйте точку: `profile.age`.
+- select([...]) — перечисление полей (по умолчанию «*»).
 - where()/orWhere()/whereNot()/orWhereNot() — условия, поддерживаются массивы и выражения.
 - whereIn()/whereNotIn()/orWhereIn()/orWhereNotIn()
 - like()/notLike()/orLike()/orNotLike() — регистронезависимый поиск поддерживается флагом $insensitiveSearch.
@@ -116,7 +115,6 @@ $db->setDatabase('another_db');
 - setOnInsert('field', value) — $setOnInsert
 - push('field', value)/pull('field', value)/addToSet('field', value)
 - setUpsertFlag(true|false) — upsert при update/replace
-- allowNoFilterWrite(true|false) — разрешить операции записи без where
 
 Примеры:
 ```php
@@ -194,7 +192,7 @@ class UserModel extends Model
     protected $returnType = \App\Entities\User::class; // опционально
 
     protected $casts = [
-        '_id'        => 'objectid',
+        '_id'        => 'string',
         'created_at' => 'datetime',
         'roles'      => 'array',
     ];
@@ -237,11 +235,7 @@ composer test
 В репозитории настроен GitHub Actions workflow (php.yml), который запускает тесты автоматически. См. статус по беджу в начале README.
 
 ## Миграции и сиды
-Вы можете использовать стандартные механизмы CI4. В тестах есть примеры миграций/сидов для MongoDB (см. каталог tests/_support).
-
-## FAQ
-- Бейдж CI не отображается? Убедитесь, что файл workflow называется `php.yml` и находится в `.github/workflows`. В локальном дереве проекта директория может отличаться, однако для GitHub важен путь `.github/workflows/php.yml`.
-- Как задать строку подключения? Через `dsn` (рекомендуется) или отдельные параметры `hostname/port/username/password/database`.
+Вы можете использовать стандартные механизмы CI4. В тестах есть примеры миграций для MongoDB (см. каталог tests/_support).
 
 ## Лицензия
 MIT (см. файл LICENSE).
