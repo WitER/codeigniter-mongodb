@@ -20,11 +20,11 @@
   ],
   "require": {
     "php": ">=8.1",
-    "mongodb/mongodb": "v1.19.x-dev"
+    "mongodb/mongodb": "*"
   },
-  "minimum-stability": "dev",
+  "minimum-stability": "stable",
   "require-dev": {
-    "phpunit/phpunit": "10.5.x-dev",
+    "phpunit/phpunit": "*",
     "codeigniter4/codeigniter4": "dev-develop"
   },
   "autoload": {

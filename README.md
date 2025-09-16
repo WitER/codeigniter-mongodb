@@ -26,8 +26,8 @@ It provides a convenient API for MongoDB CRUD operations, aggregations, and tran
 
 ## Requirements
 - PHP >= 8.1
-- ext-mongodb ^1.19
-- mongodb/mongodb 1.19.x
+- ext-mongodb
+- mongodb/mongodb
 - CodeIgniter 4 (develop branch is used for tests in this repo)
 
 See composer.json for exact versions.
