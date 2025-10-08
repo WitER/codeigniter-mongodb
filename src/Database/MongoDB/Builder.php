@@ -312,15 +312,12 @@ class Builder extends BaseBuilder
             $expr['$options'] = 'i';
         }
         if (is_array($field)) {
-            $or = [];
+            // Apply as OR across provided fields without creating nested $or
+            $first = true;
             foreach ($field as $f) {
-                $key = $this->normalizeFieldKey((string)$f);
-                $or[] = [$key => $expr];
-            }
-            if ($this->filter === []) {
-                $this->filter = ['$or' => $or];
-            } else {
-                $this->filter = ['$and' => [$this->filter, ['$or' => $or]]];
+                // For the first element inside a group with only AND terms, switching to OR will lift the accumulated AND as a single term
+                $this->applyParsedWhere((string)$f, $expr, true, false, true);
+                $first = false;
             }
         } else {
             $this->applyParsedWhere((string)$field, $expr, false, false, true);
@@ -349,17 +346,9 @@ class Builder extends BaseBuilder
             $expr['$options'] = 'i';
         }
         if (is_array($field)) {
-            // For notLike across multiple fields, combine with AND (all must not match)
-            $ands = [];
+            // Apply each NOT LIKE as AND without manual $and wrapper
             foreach ($field as $f) {
-                $key = $this->normalizeFieldKey((string)$f);
-                $ands[] = [$key => ['$not' => $expr]];
-            }
-            $clause = ['$and' => $ands];
-            if ($this->filter === []) {
-                $this->filter = $clause;
-            } else {
-                $this->filter = ['$and' => [$this->filter, $clause]];
+                $this->applyParsedWhere((string)$f, ['$not' => $expr], false, false, true);
             }
         } else {
             $this->applyParsedWhere((string)$field, ['$not' => $expr], false, false, true);
@@ -391,17 +380,11 @@ class Builder extends BaseBuilder
             $expr['$options'] = 'i';
         }
         if (is_array($field)) {
-            $or = [];
             foreach ($field as $f) {
-                $key = $this->normalizeFieldKey((string)$f);
-                $or[] = [$key => $expr];
+                $this->applyParsedWhere((string)$f, $expr, true, false, true);
             }
-            $clause = ['$or' => $or];
-            $this->filter = $this->filter === [] ? $clause : ['$or' => [$this->filter, $clause]];
         } else {
-            $key = $this->normalizeFieldKey((string)$field);
-            $clause = [$key => $expr];
-            $this->filter = $this->filter === [] ? $clause : ['$or' => [$this->filter, $clause]];
+            $this->applyParsedWhere((string)$field, $expr, true, false, true);
         }
         return $this;
     }
@@ -430,15 +413,11 @@ class Builder extends BaseBuilder
             $expr['$options'] = 'i';
         }
         if (is_array($field)) {
-            $or = [];
             foreach ($field as $f) {
-                $or[] = [(string)$f => ['$not' => $expr]];
+                $this->applyParsedWhere((string)$f, ['$not' => $expr], true, false, true);
             }
-            $clause = ['$or' => $or];
-            $this->filter = $this->filter === [] ? $clause : ['$or' => [$this->filter, $clause]];
         } else {
-            $clause = [(string)$field => ['$not' => $expr]];
-            $this->filter = $this->filter === [] ? $clause : ['$or' => [$this->filter, $clause]];
+            $this->applyParsedWhere((string)$field, ['$not' => $expr], true, false, true);
         }
         return $this;
     }
@@ -1436,9 +1415,22 @@ class Builder extends BaseBuilder
         if ($or) {
             if ($this->filter === []) {
                 $this->filter = $clause;
-            } else {
-                $this->filter = ['$or' => [$this->filter, $clause]];
+                return;
             }
+            // Flatten OR chains instead of nesting
+            $leftTerms = [];
+            if (is_array($this->filter) && isset($this->filter['$or']) && is_array($this->filter['$or'])) {
+                $leftTerms = $this->filter['$or'];
+            } else {
+                $leftTerms = [$this->filter];
+            }
+            $rightTerms = [];
+            if (is_array($clause) && isset($clause['$or']) && is_array($clause['$or'])) {
+                $rightTerms = $clause['$or'];
+            } else {
+                $rightTerms = [$clause];
+            }
+            $this->filter = ['$or' => array_merge($leftTerms, $rightTerms)];
             return;
         }
         // AND merge field-wise at top-level
@@ -1461,7 +1453,11 @@ class Builder extends BaseBuilder
         if ($asOr && $op === '$and') {
             // Mixed OR inside AND-group: convert accumulated AND terms into a single term
             $compiledSoFar = $this->compileGroup($this->groupStack[$idx]);
-            $this->groupStack[$idx] = ['op' => '$or', 'terms' => [$compiledSoFar]];
+            $terms = [];
+            if ($compiledSoFar !== [] && $compiledSoFar !== null) {
+                $terms[] = $compiledSoFar;
+            }
+            $this->groupStack[$idx] = ['op' => '$or', 'terms' => $terms];
         }
         $this->groupStack[$idx]['terms'][] = $clause;
     }
@@ -1526,7 +1522,21 @@ class Builder extends BaseBuilder
             return ['$and' => $andTerms];
         }
         if ($op === '$or') {
-            return ['$or' => $terms];
+            // Flatten nested $or groups and collapse single-term $or
+            $flat = [];
+            foreach ($terms as $t) {
+                if (is_array($t) && isset($t['$or']) && is_array($t['$or'])) {
+                    foreach ($t['$or'] as $tt) {
+                        $flat[] = $tt;
+                    }
+                } else {
+                    $flat[] = $t;
+                }
+            }
+            if (count($flat) === 1) {
+                return $flat[0];
+            }
+            return ['$or' => $flat];
         }
         // $nor
         return ['$nor' => $terms];
